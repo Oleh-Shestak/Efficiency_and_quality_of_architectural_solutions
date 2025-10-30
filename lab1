@@ -63,10 +63,10 @@
         
         ЯКЩО storageType == "Local" ТО
             storage = НОВИЙ LocalStorage()
-        ИНАКШЕ ЯКЩО storageType == "AmazonS3" ТО
+        ІНАКШЕ ЯКЩО storageType == "AmazonS3" ТО
             storage = НОВЫЙ AmazonS3Storage()
-        [cite_start]// Якщо в майбутньому з'явиться 'GoogleDrive', просто додати 'ИНАКШЕ ЯКЩО'
-        ИНАКШЕ
+        [cite_start]// Якщо в майбутньому з'явиться 'GoogleDrive', просто додати 'ІНАКШЕ ЯКЩО'
+        ІНАКШЕ
             ВИВЕСТИ ПОМИЛКУ "Невідомий тип сховища"
         КІНЕЦ ЯКЩО
         
