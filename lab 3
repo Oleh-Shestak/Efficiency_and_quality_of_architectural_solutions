@@ -1,0 +1,167 @@
+// --- 1. Спільний Інтерфейс Будівельника ---
+// Завдання вимагає, щоб в обох будівельників був спільний інтерфейс.
+// Він визначає кроки, необхідні для створення запиту.
+// Методи повертають 'QueryBuilder', щоб дозволити "ланцюжок викликів" (method chaining).
+
+ІНТЕРФЕЙС QueryBuilder
+    // Вказує, з якої таблиці та які поля вибрати
+    МЕТОД select(table: String, fields: Array<String>) : ПОВЕРТАЄ QueryBuilder
+
+    // Додає умову WHERE. (Для простоти, лише одна умова)
+    МЕТОД where(field: String, operator: String, value: String) : ПОВЕРТАЄ QueryBuilder
+
+    // Додає ліміт на кількість рядків
+    МЕТОД limit(count: Int) : ПОВЕРТАЄ QueryBuilder
+
+    // Повертає кінцевий SQL-запит у вигляді рядка
+    МЕТОД getSQL() : ПОВЕРТАЄ String
+    
+    // Скидає будівельник до початкового стану
+    МЕТОД reset()
+КОНЕЦ ИНТЕРФЕЙСА
+
+
+// --- 2. Конкретний Будівельник для PostgreSQL ---
+// Цей клас реалізує інтерфейс QueryBuilder, генеруючи SQL
+// зі специфічним синтаксисом для PostgreSQL.
+
+КЛАС PostgresQueryBuilder РЕАЛИЗУЕТ QueryBuilder
+    ПРИВАТНЕ ПОЛЕ query_table: String
+    ПРИВАТНЕ ПОЛЕ query_fields: Array<String>
+    ПРИВАТНЕ ПОЛЕ query_condition: String
+    ПРИВАТНЕ ПОЛЕ query_limit: Int
+    
+    ПУБЛІЧНИЙ КОНСТРУКТОР()
+        this.reset()
+    КІНЕЦЬ КОНСТРУКТОРА
+
+    ПУБЛІЧНИЙ МЕТОД reset()
+        // Скидаємо всі поля
+        this.query_table = ""
+        this.query_fields = ["*"]
+        this.query_condition = ""
+        this.query_limit = 0
+    КІНЕЦЬ МЕТОДА
+
+    ПУБЛІЧНИЙ МЕТОД select(table: String, fields: Array<String>) : ПОВЕРТАЄ QueryBuilder
+        this.query_table = table
+        this.query_fields = fields
+        ПОВЕРНУТИ this
+    КІНЕЦЬ МЕТОДА
+
+    ПУБЛІЧНИЙ МЕТОД where(field: String, operator: String, value: String) : ПОВЕРТАЄ QueryBuilder
+        // Postgres використовує подвійні лапки для імен полів/таблиць
+        // і одинарні для значень-рядків
+        this.query_condition = "WHERE \"" + field + "\" " + operator + " '" + value + "'"
+        ПОВЕРНУТИ this
+    КІНЕЦЬ МЕТОДА
+
+    ПУБЛІЧНИЙ МЕТОД limit(count: Int) : ПОВЕРТАЄ QueryBuilder
+        this.query_limit = count
+        ПОВЕРНУТИ this
+    КІНЕЦЬ МЕТОДА
+
+    // Метод, що збирає фінальний продукт (SQL-рядок)
+    ПУБЛІЧНИЙ МЕТОД getSQL() : ПОВЕРТАЄ String
+        ЗМІННА sql = "SELECT " + this.query_fields.join(", ")
+        sql += " FROM \"" + this.query_table + "\""
+        
+        ЯКЩО this.query_condition НЕ ПУСТИЙ ТО
+            sql += " " + this.query_condition
+        КІНЕЦЬ ЯКЩО
+
+        ЯКЩО this.query_limit > 0 ТО
+            sql += " LIMIT " + this.query_limit
+        КІНЕЦЬ ЯКЩО
+
+        sql += ";"
+        this.reset() // Очищуємо будівельник для наступного використання
+        ПОВЕРНУТИ sql
+    КІНЕЦЬ МЕТОДА
+КІНЕЦЬ КЛАССА
+
+
+// --- 3. Конкретний Будівельник для MySQL ---
+// Цей клас також реалізує QueryBuilder, але генерує SQL
+// зі синтаксисом, специфічним для MySQL.
+
+КЛАС MySqlQueryBuilder РЕАЛИЗУЄ QueryBuilder
+    // Для демонстрації, цей будівельник буде збирати запит "на льоту"
+    ПРИВАТНЕ ПОЛЕ query_parts: Array<String>
+    
+    ПУБЛІЧНИЙ КОНСТРУКТОР()
+        this.reset()
+    КІНЕЦЬ КОНСТРУКТОРА
+
+    ПУБЛІЧНИЙ МЕТОД reset()
+        this.query_parts = НОВЫЙ Array()
+    КІНЕЦЬ МЕТОДА
+
+    ПУБЛІЧНИЙ МЕТОД select(table: String, fields: Array<String>) : ПОВЕРТАЄ QueryBuilder
+        // MySQL використовує зворотні лапки (backticks) для імен
+        ЗМІННА field_list = fields.join("`, `")
+        this.query_parts.push("SELECT `" + field_list + "` FROM `" + table + "`")
+        ПОВЕРНУТИ this
+    КІНЕЦЬ МЕТОДА
+
+    ПУБЛІЧНИЙ МЕТОД where(field: String, operator: String, value: String) : ПОВЕРТАЄ QueryBuilder
+        this.query_parts.push("WHERE `" + field + "` " + operator + " '" + value + "'")
+        ПОВЕРНУТИ this
+    КІНЕЦЬ МЕТОДА
+
+    ПУБЛІЧНИЙ МЕТОД limit(count: Int) : ПОВЕРТАЄ QueryBuilder
+        this.query_parts.push("LIMIT " + count)
+        ПОВЕРНУТИ this
+    КІНЕЦЬ МЕТОДА
+
+    // Метод, що збирає фінальний продукт
+    ПУБЛІЧНИЙ МЕТОД getSQL() : ПОВЕРТАЄ String
+        ЗМІННА sql = this.query_parts.join(" ") + ";"
+        this.reset() // Очищуємо будівельник
+        ПОВЕРНУТИ sql
+    КІНЕЦЬ МЕТОДА
+КІНЕЦЬ КЛАССА
+
+    // Ось приклад того, як клієнт (головна програма) буде використовувати будівельників для звернення до обох СУБД.
+
+ПОЧАТОК (Головна програма)
+
+    // --- Приклад 1: Створення запиту для PostgreSQL ---
+    
+    ВИВІД "--- Створення запиту для PostgreSQL ---"
+    
+    // 1. Створюємо конкретного будівельника
+    ЗМІННА postgresBuilder: QueryBuilder = НОВИЙ PostgresQueryBuilder()
+    
+    // 2. Клієнт керує процесом "будівництва", викликаючи методи
+    // Використовуємо ланцюжок викликів для зручності
+    postgresBuilder.select("users", ["name", "email"])
+                   .where("age", ">", "25")
+                   .limit(10)
+    
+    // 3. Отримуємо готовий продукт (SQL-запит)
+    ЗМІННА postgresSql = postgresBuilder.getSQL()
+    
+    ВИВІД postgresSql
+    // Очікуваний результат:
+    // SELECT name, email FROM "users" WHERE "age" > '25' LIMIT 10;
+    
+    
+    // --- Приклад 2: Створення запиту для MySQL ---
+    
+    ВИВІД "--- Створення запиту для MySQL ---"
+    
+    // 1. Створюємо іншого будівельника
+    ЗМІННА mysqlBuilder: QueryBuilder = НОВЫЙ MySqlQueryBuilder()
+    
+    // 2. Використовуємо той самий процес будівництва.
+    // Клієнтський код не змінюється, хоча "під капотом" працює інша логіка.
+    ЗМІННА mysqlSql = mysqlBuilder.select("products", ["product_name"])
+                                    .where("category_id", "=", "5")
+                                    .getSQL() // Можна викликати getSQL прямо в ланцюжку
+    
+    ВИВІД mysqlSql
+    // Очікуваний результат:
+    // SELECT `product_name` FROM `products` WHERE `category_id` = '5';
+    
+КІНЕЦЬ
