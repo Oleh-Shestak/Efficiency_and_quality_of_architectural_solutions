@@ -1,0 +1,143 @@
+Логіка патерна:
+
+1.  Продукт (`SocialNetworkConnector`): Це загальний `інтерфейс` для всіх соцмереж. Він вимагає, щоб усі мали метод `postMessage`.
+2.  Конкретні Продукти (`FacebookConnector`, `LinkedInConnector`): Це класи, що реалізують `інтерфейс`.
+3.  Творець (`SocialNetworkPoster`): Це `абстрактний` клас, який "знає", як публікувати (загальний алгоритм: "створити підключення", "відправити пост", "закрити підключення"), але він не знає, яке саме підключення створювати.
+4.  Фабричний Метод (`createConnector`): Це `абстрактний` метод у класі `SocialNetworkPoster`.
+5.  Конкретні Творці (`FacebookPoster`, `LinkedInPoster`): Це класи, що наслідують `SocialNetworkPoster`. Вони реалізують фабричний метод і "кажуть": "Ага, я створюю `FacebookConnector` (з `login` і `password`)", а інший каже: "Я створюю `LinkedInConnector` (з `email` і `password`)".
+
+// --- 1. Інтерфейс Продукту ---
+// Загальний інтерфейс для всіх конекторів до соцмереж.
+// Гарантує, що всі вони матимуть однаковий набір методів.
+
+ІНТЕРФЕЙС SocialNetworkConnector
+    МЕТОД postMessage(message: String) : ПОВЕРТАЄ Boolean
+    МЕТОД logOut()
+КІНЕЦ ІНТЕРФЕЙСА
+
+// --- 2. Конкретні Продукти ---
+// Реалізації інтерфейсу для кожної соцмережі.
+
+КЛАС FacebookConnector РЕАЛІЗУЄ SocialNetworkConnector
+    // Приймає специфічні для Facebook дані для входу
+    ПУБЛІЧНИЙ КОНСТРУКТОР(login: String, password: String)
+        // тут була б логіка підключення до Facebook
+    КІНЕЦ КОНСТРУКТОРА
+
+    МЕТОД postMessage(message: String) : ПОВЕРТАЄ Boolean
+        // тут була б логіка відправки поста у Facebook
+        ВИВІД "Пост відправлено у Facebook: " + message
+        ПОВЕРНУТИ true
+    КІНЕЦ МЕТОДА
+
+    МЕТОД logOut()
+        // тут була б логіка виходу
+    КІНЕЦ МЕТОДА
+КІНЕЦ КЛАСА
+
+КЛАС LinkedInConnector РЕАЛІЗУЄ SocialNetworkConnector
+    // Приймає специфічні для LinkedIn дані для входу
+    ПУБЛІЧНИЙ КОНСТРУКТОР(email: String, password: String)
+        // тут була б логіка підключення до LinkedIn
+    КІНЕЦ КОНСТРУКТОРА
+
+    МЕТОД postMessage(message: String) : ПОВЕРТАЭ Boolean
+        // тут була б логіка відправки поста у LinkedIn
+        ВИВІД "Пост відправлено у LinkedIn: " + message
+        ПОВЕРНУТИ true
+    КІНЕЦ МЕТОДА
+
+    МЕТОД logOut()
+        // тут була б логіка виходу
+    КІНЕЦ МЕТОДА
+КІНЕЦ КЛАСА
+
+// --- 3. Абстрактний Творець ---
+// Містить загальну логіку публікації та АБСТРАКТНИЙ "Фабричний Метод"
+
+АБСТРАКТНИЙ КЛАС SocialNetworkPoster
+    // Це і є "Фабричний метод".
+    // Він абстрактний, тому дочірні класи ЗОБОВ'ЯЗАНІ його реалізувати.
+    АБСТРАКТНИЙ МЕТОД createConnector() : ПОВЕРТАЄ SocialNetworkConnector
+
+    // Загальний метод, який використовує фабричний метод
+    ПУБЛІЧНИЙ МЕТОД publish(message: String)
+        // 1. Отримати продукт (ми не знаємо який, це вирішить підклас)
+        ЗМІННА connector = this.createConnector()
+        
+        // 2. Використати продукт
+        connector.postMessage(message)
+        
+        // 3. Завершити роботу
+        connector.logOut()
+    КІНЕЦ МЕТОДА
+КІНЕЦ КЛАСА
+
+// --- 4. Конкретні Творці ---
+// Реалізують "Фабричний метод", щоб створювати конкретні продукти.
+
+КЛАС FacebookPoster НАСЛІДУЄ SocialNetworkPoster
+    ПРИВАТНЕ ПОЛЕ login: String
+    ПРИВАТНЕ ПОЛЕ password: String
+
+    ПУБЛІЧНИЙ КОНСТРУКТОР(login: String, password: String)
+        this.login = login
+        this.password = password
+    КІНЕЦ КОНСТРУКТОРА
+
+    // Реалізація фабричного методу
+    // Цей клас "знає", що треба створити FacebookConnector
+    // і що йому потрібні 'login' та 'password'
+    МЕТОД createConnector() : ПОВЕРТАЄ SocialNetworkConnector
+        ПОВЕРНУТИ НОВИЙ FacebookConnector(this.login, this.password)
+    КІНЕЦ МЕТОДА
+КІНЕЦ КЛАСА
+
+КЛАС LinkedInPoster НАСЛЕДУЕТ SocialNetworkPoster
+    ПРИВАТНЕ ПОЛЕ email: String
+    ПРИВАТНЕ ПОЛЕ password: String
+
+    ПУБЛІЧНИЙ КОНСТРУКТОР(email: String, password: String)
+        this.email = email
+        this.password = password
+    КІНЕЦ КОНСТРУКТОРА
+
+    // Реалізація фабричного методу
+    // Цей клас "знає", що треба створити LinkedInConnector
+    // і що йому потрібні 'email' та 'password'
+    МЕТОД createConnector() : ПОВЕРТАЄ SocialNetworkConnector
+        ПОВЕРНУТИ НОВИЙ LinkedInConnector(this.email, this.password)
+    КІНЕЦ МЕТОДА
+КІНЕЦ КЛАСА
+
+// --- 5. Приклад використання (Хід роботи) ---
+// Демонстрація публікації в обох соціальних мережах
+
+ПОЧАТОК (Головна програма)
+    ЗМІННА poster: SocialNetworkPoster
+
+    // --- Публікація у Facebook ---
+    // Створюємо конкретного "Творця" для Facebook
+    ВСТАНОВИТИ poster = НОВИЙ FacebookPoster("my_fb_login", "my_fb_pass")
+    
+    // І викликаємо загальний метод публікації
+    // poster сам викличе свій фабричний метод і створить FacebookConnector
+    poster.publish("Це мій перший пост через Фабричний Метод!")
+
+    
+    // --- Публікація у LinkedIn ---
+    // Ми створюємо конкретного "Творця" для LinkedIn
+    ВСТАНОВИТИ poster = НОВИЙ LinkedInPoster("my.email@gmail.com", "my_li_pass")
+    
+    // Ми викликаємо ТОЙ САМИЙ метод publish
+    // Але тепер poster — це LinkedInPoster,
+    // тому він створить LinkedInConnector
+    poster.publish("Шукаю нові кар'єрні можливості.")
+
+    // --- Якщо в майбутньому додамо Twitter ---
+    // 1. Створюємо КЛАСС TwitterConnector
+    // 2. Створюємо КЛАСС TwitterPoster
+    // 3. УСТАНОВИТЬ poster = НОВЫЙ TwitterPoster(...)
+    // 4. poster.publish(...)
+    
+КІНЕЦ
