@@ -1,0 +1,146 @@
+// --- 1. Цільовий інтерфейс ---
+// Це інтерфейс, до якого ми будемо "адаптувати" нові класи.
+
+ІНТЕРФЕЙС Notification
+    МЕТОД send(title: String, message: String)
+КІНЕЦЬ ІНТЕРФЕЙСА
+
+// --- 2. Існуючий клас, що реалізує інтерфейс ---
+
+КЛАС EmailNotification РЕАЛИЗУЕТ Notification
+    ПРИВАТНЕ ПОЛЕ adminEmail: String
+
+    ПУБЛІЧНИЙ КОНСТРУКТОР(adminEmail: String)
+        this.adminEmail = adminEmail
+    КІНЕЦЬ КОНСТРУКТОРА
+
+    ПУБЛІЧНИЙ МЕТОД send(title: String, message: String)
+        // тут логіка mail(...)
+        ВИВІД "EMAIL: Відправлено на '{$this.adminEmail}' з темою '$title': '$message'"
+    КІНЕЦЬ МЕТОДА
+КІНЕЦЬ КЛАСА
+
+// --- 3. Сторонні сервіси (Adaptees) ---
+// Це нові класи, які мають несумісні інтерфейси.
+// Вони нічого не знають про інтерфейс Notification.
+
+// Сторонній клас для Slack
+КЛАС SlackAPI
+    ПРИВАТНЕ ПОЛЕ login: String
+    ПРИВАТНЕ ПОЛЕ apiKey: String
+
+    ПУБЛІЧНИЙ КОНСТРУКТОР(login: String, apiKey: String)
+        this.login = login
+        this.apiKey = apiKey
+        // тут логіка авторизації
+        ВИВІД "SLACK API: Авторизовано як '{$this.login}'"
+    КІНЕЦ КОНСТРУКТОРА
+
+    // Цей метод НЕ сумісний з Notification.send()
+    ПУБЛІЧНИЙ МЕТОД sendMessageToChat(chatId: String, text: String)
+        ВИВІД "SLACK API: Повідомлення '$text' відправлено у чат '$chatId'"
+    КІНЕЦЬ МЕТОДА
+КІНЕЦЬ КЛАСА
+
+// Сторонній клас для SMS
+КЛАС SmsService
+    ПРИВАТНЕ ПОЛЕ senderName: String
+
+    ПУБЛІЧНИЙ КОНСТРУКТОР(sender: String)
+        this.senderName = sender // Ім'я відправника
+        ВИВІД "SMS Service: Ініціалізовано відправника '{$this.senderName}'"
+    КІНЕЦЬ КОНСТРУКТОРА
+
+    // Цей метод теж НЕ сумісний з Notification.send()
+    ПУБЛІЧНИЙ МЕТОД sendSms(phoneNumber: String, message: String)
+        ВИВІД "SMS Service: На номер '$phoneNumber' відправлено: '$message'"
+    КІНЕЦЬ МЕТОДА
+КІНЕЦЬ КЛАСА
+
+
+// --- 4. Класи-Адаптери ---
+// "Містки", які реалізують Notification і "обгортають" сторонні сервіси.
+
+КЛАС SlackNotificationAdapter РЕАЛИЗУЄ Notification
+    ПРИВАТНЕ ПОЛЕ slackApi: SlackAPI // "Обгортаємо" SlackAPI
+    ПРИВАТНЕ ПОЛЕ chatId: String     // Зберігаємо потрібний chatId
+
+    ПУБЛІЧНИЙ КОНСТРУКТОР(slackApi: SlackAPI, chatId: String)
+        this.slackApi = slackApi
+        this.chatId = chatId
+    КІНЕЦЬ КОНСТРУКТОРА
+
+    // Реалізуємо метод з інтерфейсу Notification
+    ПУБЛІЧНИЙ МЕТОД send(title: String, message: String)
+        // "Адаптуємо" дані: перетворюємо (title, message) на (text)
+        ЗМІННА slackMessage = "Тема: " + title + ". Повідомлення: " + message
+        
+        // Викликаємо метод стороннього сервісу з потрібними даними
+        this.slackApi.sendMessageToChat(this.chatId, slackMessage)
+    КІНЕЦЬ МЕТОДА
+КІНЕЦЬ КЛАСА
+
+КЛАС SmsNotificationAdapter РЕАЛИЗУЕТ Notification
+    ПРИВАТНЕ ПОЛЕ smsService: SmsService // "Обгортаємо" SmsService
+    ПРИВАТНЕ ПОЛЕ phoneNumber: String   // Зберігаємо потрібний номер телефону
+
+    ПУБЛІЧНИЙ КОНСТРУКТОР(smsService: SmsService, phone: String)
+        this.smsService = smsService
+        this.phoneNumber = phone
+    КІНЕЦЬ КОНСТРУКТОРА
+
+    // Реалізуємо метод з інтерфейсу Notification
+    ПУБЛІЧНИЙ МЕТОД send(title: String, message: String)
+        // "Адаптуємо" дані: перетворюємо (title, message) на (smsText)
+        ЗМІННА smsText = title + ": " + message
+        
+        // Викликаємо метод стороннього сервісу з потрібними даними
+        this.smsService.sendSms(this.phoneNumber, smsText)
+    КІНЕЦЬ МЕТОДА
+КІНЕЦЬ КЛАСА
+
+// Приклад клієнтського коду
+
+ПОЧАТОК (Головна програма)
+
+    // --- 1. Налаштування сторонніх сервісів (Adaptees) ---
+    // (У реальному житті ці об'єкти могли б створюватися один раз)
+    ЗМІННА slackApi = НОВИЙ SlackAPI("my_slack_login", "slack_api_key_123")
+    ЗМІННА smsService = НОВИЙ SmsService("MyWebApp") // Ім'я відправника
+
+    
+    // --- 2. Створення списку сповіщень ---
+    // Клієнтський код (наприклад, система моніторингу)
+    // працює зі списком типу Notification.
+    
+    ЗМІННА notificationList: Array<Notification> = НОВЫЙ Array()
+
+    // Додаємо звичайне Email-сповіщення
+    notificationList.push(НОВЫЙ EmailNotification("admin@my-site.com"))
+
+    // Додаємо Slack-сповіщення через Адаптер
+    notificationList.push(НОВЫЙ SlackNotificationAdapter(slackApi, "#alerts-channel"))
+    
+    // Додаємо SMS-сповіщення через Адаптер
+    notificationList.push(НОВЫЙ SmsNotificationAdapter(smsService, "+380991112233"))
+
+    
+    // --- 3. Відправка всіх сповіщень ---
+    // Клієнт просто перебирає список і викликає ОДИНАКОВИЙ метод 'send'.
+    // Йому неважливо, що під капотом: Email, Slack чи SMS.
+    
+    ЗМІННА title = "Критична помилка!"
+    ЗМІННА message = "Сервер бази даних не відповідає."
+
+    ДЛЯ КОЖНОГО notifier З notificationList ВИКОНУВАТИ
+        notifier.send(title, message)
+    КІНЕЦЬ ДЛЯ
+    
+КІНЕЦЬ
+
+// --- ОЧІКУВАНИЙ РЕЗУЛЬТАТ ВИКОНАННЯ ---
+// SLACK API: Авторизовано як 'my_slack_login'
+// SMS Service: Ініціалізовано відправника 'MyWebApp'
+// EMAIL: Відправлено на 'admin@my-site.com' з темою 'Критична помилка!': 'Сервер бази даних не відповідає.'
+// SLACK API: Повідомлення 'Тема: Критична помилка!. Повідомлення: Сервер бази даних не відповідає.' відправлено у чат '#alerts-channel'
+// SMS Service: На номер '+380991112233' відправлено: 'Критична помилка!: Сервер бази даних не відповідає.'
