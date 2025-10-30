@@ -1,0 +1,118 @@
+// --- 1. Інтерфейс для всіх типів сховищ ---
+ІНТЕРФЕЙС Storage
+      МЕТОД uploadFile(filePath: String, content: Data) : Повертає Boolean
+      МЕТОД downloadFile(filePath: String) : Повертає Data
+КІНЕЦЬ ІНТЕРФЕЙСУ
+
+// --- 2. Конкретні реалізації сховищ ---
+
+КЛАС LocalStorage РЕАЛІЗУЄ Storage
+    // Реалізація методів для локального диска
+    МЕТОД uploadFile(filePath: String, content: Data) : ПОВЕРТАЄ Boolean
+        // тут була б логіка збереження файлу на диск
+        ПОВЕРНУТИ true
+    МЕТОД downloadFile(filePath: String) : ПОВЕРТАЄ Data
+        // тут була б логіка читання файлу з диска
+        ПОВЕРТАЄ (якісь дані)
+КІНЕЦ КЛАСА
+
+КЛАС AmazonS3Storage РЕАЛІЗУЄ Storage
+    // Реалізація методів для S3
+    МЕТОД uploadFile(filePath: String, content: Data) : ПОВЕРТАЄ Boolean
+        // тут була б логіка завантаження в S3
+        ПОВЕРНУТИ true
+    МЕТОД downloadFile(filePath: String) : ПОВЕРНУТИ Data
+        // тут була б логіка завантаження з S3
+        ПОВЕРНУТИ (якісь дані)
+КІНЕЦ КЛАСА
+
+// --- 3. Клас User (для демонстрації) ---
+
+КЛАС User
+    ПУБЛІЧНЕ ПОЛЕ userId: String
+КіНЕЦ КЛАСА
+
+
+// --- 4. Одинак (Singleton) ---
+// Це головний клас, що реалізує патерн
+
+КЛАС FileManager
+    // Приватне статичне поле для зберігання єдиного екземпляра
+    ПРИВАТНЕ СТАТИЧНЕ ПОЛЕ instance: FileManager
+
+    // Словник (Map) для зберігання обраного сховища для кожного користувача
+    // Ключ - ID користувача, Значення - екземпляр його Сховища
+    ПРИВАТНЕ ПОЛЕ userStorageMap: Map<String, Storage>
+
+    // Приватний конструктор, щоб заборонити створення через "new"
+    ПРИВАТНИЙ КОНСТРУКТОР()
+        ВСТАНОВИТИ userStorageMap = НОВА Map()
+    КІНЕЦ КОНСТРУКТОРА
+
+    // Публічний статичний метод для отримання єдиного екземпляра
+    ПУБЛІЧНИЙ СТАТИЧНИЙ МЕТОД getInstance() : ПОВЕРТАЄ FileManager
+        ЯКЩО instance == NULL ТО
+            instance = НОВИЙ FileManager()
+        КІНЕЦ ЯКЩО
+        ПОВЕРНУТИ instance
+    КІНЕЦ МЕТОДА
+
+    // Метод для налаштування сховища для конкретного користувача
+    ПУБЛІЧНИЙ МЕТОД setStorageForUser(user: User, storageType: String)
+        ЗМІННА storage: Storage
+        
+        ЯКЩО storageType == "Local" ТО
+            storage = НОВИЙ LocalStorage()
+        ИНАКШЕ ЯКЩО storageType == "AmazonS3" ТО
+            storage = НОВЫЙ AmazonS3Storage()
+        [cite_start]// Якщо в майбутньому з'явиться 'GoogleDrive', просто додати 'ИНАКШЕ ЯКЩО'
+        ИНАКШЕ
+            ВИВЕСТИ ПОМИЛКУ "Невідомий тип сховища"
+        КІНЕЦ ЯКЩО
+        
+        // Зберігаємо вибір користувача
+        ВСТАНОВИТИ userStorageMap[user.userId] = storage
+    КІНЕЦ МЕТОДА
+
+    // Метод для отримання сховища, яке обрав користувач
+    ПУБЛІЧНИЙ МЕТОД getStorageForUser(user: User) : ПОВЕРТАЄ Storage
+        ПОВЕРНУТИ userStorageMap[user.userId]
+    КІНЕЦ МЕТОДА
+
+КІНЕЦ КЛАССА
+
+
+// --- 5. Приклад використання (Хід роботи) ---
+
+ПОЧАТОК (Головна програма)
+    // Створюємо користувачів
+    ЗМІННА userAlice = НОВИЙ User("alice123")
+    ЗМІННА userBob = НОВИЙ User("bob456")
+
+    // Отримуємо доступ до менеджера файлів (завжди один і той же екземпляр)
+    ЗМІННА manager1 = FileManager.getInstance()
+    
+    // Налаштовуємо сховища для кожного користувача окремо
+    manager1.setStorageForUser(userAlice, "Local")
+    manager1.setStorageForUser(userBob, "AmazonS3")
+
+    // --- Демонстрація роботи ---
+    // Аліса завантажує файл. Менеджер знає, що її сховище - Local.
+    ЗМІННА storageAlice = manager1.getStorageForUser(userAlice)
+    storageAlice.uploadFile("docs/report.pdf", (дані...))
+
+    // Боб завантажує файл. Менеджер знає, що його сховище - AmazonS3.
+    ЗМІННА storageBob = manager1.getStorageForUser(userBob)
+    storageBob.uploadFile("images/photo.jpg", (дані...))
+
+    // Демонстрація того, що Одинак працює:
+    // Уявімо, що в іншій частині програми ми знову викликаємо getInstance()
+    ЗМІННА manager2 = FileManager.getInstance()
+
+    // manager2 - це ТОЙ САМИЙ об'єкт, що й manager1.
+    // Тому він "пам'ятає" налаштування Боба.
+    ЗМІННА storageBobAgain = manager2.getStorageForUser(userBob)
+    // storageBobAgain - це AmazonS3Storage, як ми і очікували.
+    storageBobAgain.downloadFile("images/photo.jpg")
+    
+КІНЕЦ
