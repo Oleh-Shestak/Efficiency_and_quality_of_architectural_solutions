@@ -1,0 +1,204 @@
+КЛАС Product
+    ПУБЛІЧНЕ ПОЛЕ id: String
+    ПУБЛІЧНЕ ПОЛЕ name: String
+    ПУБЛІЧНЕ ПОЛЕ description: String
+    ПУБЛІЧНЕ ПОЛЕ image: String
+
+    ПУБЛІЧНИЙ КОНСТРУКТОР(id, name, desc, img)
+        // ... логіка присвоєння ...
+    КІНЕЦЬ КОНСТРУКТОРА
+КІНЕЦЬ КЛАСА
+
+
+// --- 1. Ієрархія Реалізації (Як малювати) ---
+// Це інтерфейс "Реалізатора" (Implementation).
+// Він визначає, ЯКІ елементи система вміє малювати.
+
+ІНТЕРФЕЙС Renderer
+    // Методи для "малювання" базових частин
+    МЕТОД renderTitle(title: String)
+    МЕТОД renderContent(content: String)
+    
+    // Спеціальний метод для малювання складного об'єкта
+    МЕТОД renderProduct(product: Product)
+
+    // Метод для отримання кінцевого результату
+    МЕТОД getResult() : ПОВЕРТАЄ String
+КІНЕЦЬ ІНТЕРФЕЙСА
+
+
+// --- 2. Конкретні Реалізації ---
+
+КЛАС HTMLRenderer РЕАЛИЗУЕТ Renderer
+    ПРИВАТНЕ ПОЛЕ htmlDocument: String
+
+    МЕТОД renderTitle(title: String)
+        this.htmlDocument += "<h1>" + title + "</h1>"
+    КІНЕЦЬ МЕТОДА
+
+    МЕТОД renderContent(content: String)
+        this.htmlDocument += "<p>" + content + "</p>"
+    КІНЕЦЬ МЕТОДА
+    
+    МЕТОД renderProduct(product: Product)
+        this.htmlDocument += "<div class='product'>"
+        this.htmlDocument += "<h2>" + product.name + " (ID: " + product.id + ")</h2>"
+        this.htmlDocument += "<img src='" + product.image + "' />"
+        this.htmlDocument += "<p>" + product.description + "</p>"
+        this.htmlDocument += "</div>"
+    КІНЕЦЬ МЕТОДА
+
+    МЕТОД getResult() : ПОВЕРТАЄ String
+        ВЕРНУТЬ this.htmlDocument
+    КІНЕЦЬ МЕТОДА
+КІНЕЦЬ КЛАСА
+
+КЛАС JsonRenderer РЕАЛИЗУЕТ Renderer
+    ПРИВАТНЕ ПОЛЕ jsonObject: Map<String, Any>
+
+    МЕТОД renderTitle(title: String)
+        this.jsonObject["title"] = title
+    КІНЕЦЬ МЕТОДА
+
+    МЕТОД renderContent(content: String)
+        this.jsonObject["content"] = content
+    КІНЕЦЬ МЕТОДА
+    
+    МЕТОД renderProduct(product: Product)
+        // Створюємо вкладений об'єкт
+        ЗМІННА productData = НОВА Map()
+        productData["id"] = product.id
+        productData["name"] = product.name
+        productData["description"] = product.description
+        productData["image"] = product.image
+        
+        this.jsonObject["product"] = productData
+    КІНЕЦЬ МЕТОДА
+
+    МЕТОД getResult() : ПОВЕРТАЄ String
+        // тут була б логіка серіалізації Map в JSON-рядок
+        ПОВЕРНУТИ (рядок JSON з this.jsonObject)
+    КІНЕЦЬ МЕТОДА
+КІНЕЦЬ КЛАСА
+
+// (XmlRenderer створюється аналогічно до HTML/Json)
+КЛАС XmlRenderer РЕАЛИЗУЄ Renderer
+    // ... методи renderTitle, renderContent, renderProduct ...
+    МЕТОД getResult() : ПОВЕРТАЄ String
+        // ... логіка повернення XML ...
+        ПОВЕРНУТИ (рядок XML)
+    КІНЕЦЬ МЕТОДА
+КІНЕЦЬ КЛАССА
+
+
+// --- 3. Ієрархія Абстракції (Що малювати) ---
+// Базовий клас "Абстракції" (Abstraction).
+
+АБСТРАКТНИЙ КЛАС Page
+    // "МІСТ" - посилання на об'єкт Реалізації
+    ЗАХИЩЕНЕ ПОЛЕ renderer: Renderer
+
+    // Конструктор приймає реалізацію (Renderer)
+    ПУБЛІЧНИЙ КОНСТРУКТОР(renderer: Renderer)
+        this.renderer = renderer
+    КІНЕЦЬ КОНСТРУКТОРА
+
+    // Метод для зміни реалізації "на льоту"
+    ПУБЛІЧНИЙ МЕТОД setRenderer(renderer: Renderer)
+        this.renderer = renderer
+    КІНЕЦЬ МЕТОДА
+
+    // Абстрактний метод, який будуть реалізовувати дочірні сторінки
+    АБСТРАКТНИЙ МЕТОД render() : ПОВЕРТАЄ String
+КІНЕЦЬ КЛАСА
+
+
+// --- 4. Конкретні Абстракції ---
+// "Уточнені" абстракції (Refined Abstractions).
+
+КЛАС SimplePage НАСЛІДУЄ Page
+    ПРИВАТНЕ ПОЛЕ title: String
+    ПРИВАТНЕ ПОЛЕ content: String
+
+    ПУБЛІЧНИЙ КОНСТРУКТОР(renderer: Renderer, title: String, content: String)
+        // Викликаємо конструктор батьківського класу
+        СУПЕР(renderer) 
+        this.title = title
+        this.content = content
+    КІНЕЦЬ КОНСТРУКТОРА
+
+    // Реалізація методу render
+    ПУБЛІЧНИЙ МЕТОД render() : ПОВЕРТАЄ String
+        // Сторінка "каже" рендереру, ЩО малювати,
+        // викликаючи його низькорівневі методи
+        this.renderer.renderTitle(this.title)
+        this.renderer.renderContent(this.content)
+        
+        // І забирає готовий результат
+        ПОВЕРНУТИ this.renderer.getResult()
+    КІНЕЦЬ МЕТОДА
+КІНЕЦЬ КЛАСА
+
+КЛАС ProductPage НАСЛІДУЄ Page
+    ПРИВАТНЕ ПОЛЕ product: Product
+
+    ПУБЛІЧНИЙ КОНСТРУКТОР(renderer: Renderer, product: Product)
+        СУПЕР(renderer)
+        this.product = product
+    КІНЕЦЬ КОНСТРУКТОРА
+
+    // Реалізація методу render
+    ПУБЛІЧНИЙ МЕТОД render() : ПОВЕРТАЄ String
+        // Ця сторінка викликає інший метод рендерера
+        this.renderer.renderProduct(this.product)
+        
+        ПОВЕРНУТИ this.renderer.getResult()
+    КІНЕЦЬ МЕТОДА
+КІНЕЦ КЛАСА
+
+// Приклад клієнтського коду
+
+ПОЧАТОК (Головна программа)
+
+    // --- 1. Створюємо конкретні реалізації (Рендерери) ---
+    ЗМІННА htmlRenderer = НОВИЙ HTMLRenderer()
+    ЗМІННА jsonRenderer = НОВИЙ JsonRenderer()
+    ЗМІННА xmlRenderer = НОВИЙ XmlRenderer()
+
+    // --- 2. Створюємо дані ---
+    ЗМІННА simpleContent = "Це вміст простої сторінки."
+    ЗМІННА productData = НОВИЙ Product("p123", "Ноутбук", "Потужний ноутбук", "/img/nb.jpg")
+
+    
+    // --- 3. Рендеримо SimplePage у HTML ---
+    // Створюємо сторінку і одразу "підключаємо" до неї HTML-міст
+    ЗМІННА simplePage = НОВИЙ SimplePage(htmlRenderer, "Про Нас", simpleContent)
+    
+    ЗМІННА pageHtml = simplePage.render()
+    ВИВІД "--- SimplePage у HTML: ---"
+    ВИВІД pageHtml
+    // Очікуваний результат: "<h1>Про Нас</h1><p>Це вміст...</p>"
+
+
+    // --- 4. Рендеримо ProductPage у JSON ---
+    // Створюємо сторінку товару і підключаємо JSON-міст
+    ЗМІННА productPage = НОВЫЙ ProductPage(jsonRenderer, productData)
+    
+    ЗМІННА pageJson = productPage.render()
+    ВИВІД "--- ProductPage у JSON: ---"
+    ВИВІД pageJson
+    // Очікуваний результат: "{ 'product': { 'id': 'p123', 'name': 'Ноутбук', ... } }"
+
+    
+    // --- 5. Демонстрація гнучкості "Моста" ---
+    // Ми беремо ТУ САМУ сторінку товару (productPage)
+    // і на льоту "перемикаємо міст" на XmlRenderer
+    
+    ВИВІД "--- Та сама ProductPage тепер у XML: ---"
+    productPage.setRenderer(xmlRenderer)
+    
+    ЗМІННА pageXml = productPage.render()
+    ВИВІД pageXml
+    // Очікуваний результат: "<product><id>p123</id>...</product>"
+
+КІНЕЦЬ
