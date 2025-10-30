@@ -41,7 +41,7 @@
         // тут була б логіка підключення до LinkedIn
     КІНЕЦЬ КОНСТРУКТОРА
 
-    МЕТОД postMessage(message: String) : ПОВЕРТАЭ Boolean
+    МЕТОД postMessage(message: String) : ПОВЕРТАЄ Boolean
         // тут була б логіка відправки поста у LinkedIn
         ВИВІД "Пост відправлено у LinkedIn: " + message
         ПОВЕРНУТИ true
