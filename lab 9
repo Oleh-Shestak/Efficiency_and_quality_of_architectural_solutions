@@ -1,0 +1,138 @@
+// 1. Інтерфейс Відвідувача (Visitor)
+// Описує методи відвідування для кожного типу елементів структури.
+INTERFACE Visitor IS
+    METHOD visitEmployee(employee: Employee) -> Void
+    METHOD visitDepartment(department: Department) -> Void
+    METHOD visitCompany(company: Company) -> Void
+END INTERFACE
+
+
+// 2. Інтерфейс Елемента (Element)
+// Описує метод прийняття відвідувача.
+INTERFACE Visitable IS
+    METHOD accept(visitor: Visitor) -> Void
+END INTERFACE
+
+
+// 3. Конкретні Елементи (Concrete Elements)
+
+// Клас Співробітник
+CLASS Employee IMPLEMENTS Visitable IS
+    PUBLIC PROPERTY position: String
+    PUBLIC PROPERTY salary: Float
+
+    CONSTRUCTOR(position: String, salary: Float) IS
+        THIS.position = position
+        THIS.salary = salary
+    END CONSTRUCTOR
+
+    METHOD accept(visitor: Visitor) -> Void IS
+        // Викликає метод відвідувача, специфічний для Співробітника
+        visitor.visitEmployee(THIS)
+    END METHOD
+END CLASS
+
+
+// Клас Департамент
+CLASS Department IMPLEMENTS Visitable IS
+    PUBLIC PROPERTY employees: Array of Employee
+
+    CONSTRUCTOR(employees: Array of Employee) IS
+        THIS.employees = employees
+    END CONSTRUCTOR
+
+    METHOD accept(visitor: Visitor) -> Void IS
+        // 1. Спочатку відвідувач працює з самим департаментом
+        visitor.visitDepartment(THIS)
+        
+        // 2. Потім передаємо відвідувача далі всім співробітникам (делегування)
+        FOR EACH emp IN THIS.employees
+            emp.accept(visitor)
+        END FOR
+    END METHOD
+END CLASS
+
+
+// Клас Компанія
+CLASS Company IMPLEMENTS Visitable IS
+    PUBLIC PROPERTY departments: Array of Department
+
+    CONSTRUCTOR(departments: Array of Department) IS
+        THIS.departments = departments
+    END CONSTRUCTOR
+
+    METHOD accept(visitor: Visitor) -> Void IS
+        // 1. Відвідувач працює з компанією
+        visitor.visitCompany(THIS)
+        
+        // 2. Передаємо відвідувача всім департаментам
+        FOR EACH dept IN THIS.departments
+            dept.accept(visitor)
+        END FOR
+    END METHOD
+END CLASS
+
+
+// 4. Конкретний Відвідувач (SalaryReportVisitor)
+// Реалізує логіку створення звіту "Зарплатна відомість"
+CLASS SalaryReportVisitor IMPLEMENTS Visitor IS
+    PRIVATE PROPERTY totalSalary: Float = 0.0
+
+    // Логіка для Співробітника
+    METHOD visitEmployee(employee: Employee) -> Void IS
+        PRINT "   - Співробітник: " + employee.position + ", ЗП: " + employee.salary
+        THIS.totalSalary = THIS.totalSalary + employee.salary
+    END METHOD
+
+    // Логіка для Департаменту
+    METHOD visitDepartment(department: Department) -> Void IS
+        PRINT ">> Звіт по Департаменту (співробітників: " + department.employees.length + ")"
+    END METHOD
+
+    // Логіка для Компанії
+    METHOD visitCompany(company: Company) -> Void IS
+        PRINT "===== ЗАРПЛАТНА ВІДОМІСТЬ КОМПАНІЇ ====="
+        PRINT "Всього департаментів: " + company.departments.length
+    END METHOD
+    
+    METHOD getTotal() -> Float IS
+        RETURN THIS.totalSalary
+    END METHOD
+END CLASS
+
+
+// 5. Клієнтський код
+// Демонстрація отримання звіту для компанії та окремо для департаменту
+FUNCTION main() IS
+    // --- Ініціалізація структури даних ---
+    
+    VAR emp1 = NEW Employee("Розробник", 3000)
+    VAR emp2 = NEW Employee("Тестувальник", 2500)
+    VAR deptIT = NEW Department([emp1, emp2]) // IT відділ
+
+    VAR emp3 = NEW Employee("Менеджер", 2000)
+    VAR emp4 = NEW Employee("Бухгалтер", 2200)
+    VAR deptAdmin = NEW Department([emp3, emp4]) // Адмін відділ
+
+    VAR myCompany = NEW Company([deptIT, deptAdmin])
+
+
+    // --- СЦЕНАРІЙ 1: Звіт для всієї компанії ---
+    PRINT "\n--- Генерація звіту по всій компанії ---"
+    VAR companyVisitor = NEW SalaryReportVisitor()
+    
+    // Запускаємо відвідувача через корінь (Компанія)
+    myCompany.accept(companyVisitor)
+    
+    PRINT "Загальний фонд оплати праці по компанії: " + companyVisitor.getTotal()
+
+
+    // --- СЦЕНАРІЙ 2: Звіт для конкретного департаменту ---
+    PRINT "\n--- Генерація звіту тільки по IT департаменту ---"
+    VAR deptVisitor = NEW SalaryReportVisitor()
+    
+    // Запускаємо відвідувача безпосередньо на об'єкті Департаменту
+    deptIT.accept(deptVisitor)
+    
+    PRINT "Фонд оплати праці IT відділу: " + deptVisitor.getTotal()
+END FUNCTION
