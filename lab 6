@@ -1,0 +1,75 @@
+// 1. Інтерфейс
+// Визначає спільний інтерфейс для Реального Суб'єкта та Замісника.
+INTERFACE Downloader IS
+    METHOD download(filename: String) -> String
+END INTERFACE
+
+// 2. Реальний Суб'єкт (Real Subject)
+// Клас, який виконує реальну роботу (завантаження файлів).
+CLASS SimpleDownloader IMPLEMENTS Downloader IS
+    METHOD download(filename: String) -> String IS
+        // Симуляція довгого завантаження з мережі
+        PRINT "SimpleDownloader: Завантаження файлу " + filename + " з сервера..."
+        RETURN "Вміст файлу " + filename
+    END METHOD
+END CLASS
+
+
+// 3. Замісник (Proxy)
+// Клас, що додає логіку кешування, не змінюючи SimpleDownloader.
+CLASS CachedDownloader IMPLEMENTS Downloader IS
+    PRIVATE PROPERTY service: SimpleDownloader
+    PRIVATE PROPERTY cache: Map<String, String>
+
+    CONSTRUCTOR(realService: SimpleDownloader) IS
+        THIS.service = realService
+        THIS.cache = NEW Map()
+    END CONSTRUCTOR
+
+    METHOD download(filename: String) -> String IS
+        // Перевірка наявності в кеші
+        IF (THIS.cache HAS KEY filename) THEN
+            PRINT "CachedDownloader: Повернення збереженої копії для " + filename
+            RETURN THIS.cache[filename]
+        END IF
+
+        // Якщо в кеші немає, звертаємось до реального сервісу
+        VAR data = THIS.service.download(filename)
+        
+        // Зберігаємо результат у кеш для майбутніх запитів
+        THIS.cache[filename] = data
+        
+        RETURN data
+    END METHOD
+END CLASS
+
+
+// 4. Клієнтський код
+// Демонстрація роботи через інтерфейс Downloader.
+FUNCTION clientCode(downloader: Downloader, filename: String) IS
+    PRINT "--> Запит клієнта на файл: " + filename
+    VAR result = downloader.download(filename)
+    PRINT "    Результат: " + result
+    PRINT "--------------------------------------------------"
+END FUNCTION
+
+
+// 5. Головний метод (Main)
+FUNCTION main() IS
+    // Створення реального об'єкта
+    VAR realService = NEW SimpleDownloader()
+    
+    // Створення замісника, в який передаємо реальний об'єкт
+    VAR proxy = NEW CachedDownloader(realService)
+
+    PRINT "=== ТЕСТУВАННЯ ПАТЕРНУ ЗАМІСНИК ==="
+
+    // Перший запит: файл завантажується з мережі (Кеш пустий)
+    clientCode(proxy, "my_movie.mp4")
+
+    // Другий запит того ж файлу: дані беруться з кешу (Замісник працює)
+    clientCode(proxy, "my_movie.mp4")
+
+    // Запит іншого файлу: знову завантаження з мережі
+    clientCode(proxy, "photo.jpg")
+END FUNCTION
