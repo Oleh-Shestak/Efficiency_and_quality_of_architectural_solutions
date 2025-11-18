@@ -1,0 +1,135 @@
+// 1. Абстрактний клас (Base Class)
+// Визначає "скелет" алгоритму оновлення даних.
+ABSTRACT CLASS BaseRestUpdater IS
+
+    // --- ШАБЛОННИЙ МЕТОД (Template Method) ---
+    // Визначає порядок виконання кроків. Цей метод не повинен бути змінений у підкласах.
+    FINAL METHOD updateEntity(id: Integer, newData: Map) -> Response IS
+        
+        // Крок 1: Отримання об'єкта
+        VAR entity = THIS.getEntity(id)
+        IF (entity IS NULL) RETURN Response(404, "Not Found")
+
+        // Хук перед валідацією (опціональний)
+        THIS.hookBeforeValidation(entity, newData)
+
+        // Крок 2: Валідація даних
+        VAR isValid = THIS.validateData(entity, newData)
+        
+        IF (isValid == FALSE) THEN
+            // Виклик хуку для обробки помилки валідації (для Товару)
+            THIS.hookOnValidationFailed(entity, newData)
+            RETURN Response(400, "Validation Error")
+        END IF
+
+        // Крок 3: Збереження інформації
+        THIS.saveEntity(entity, newData)
+
+        // Крок 4: Формування відповіді
+        RETURN THIS.formResponse(entity)
+    END METHOD
+
+
+    // --- Базові операції (Steps) ---
+
+    METHOD getEntity(id: Integer) -> Object IS
+        PRINT "Base: Пошук сутності в БД за ID..."
+        RETURN Database.find(id)
+    END METHOD
+
+    METHOD validateData(entity: Object, newData: Map) -> Boolean IS
+        PRINT "Base: Стандартна валідація полів..."
+        RETURN True // За замовчуванням валідація проходить
+    END METHOD
+
+    METHOD saveEntity(entity: Object, newData: Map) -> Void IS
+        PRINT "Base: Формування SQL запиту та збереження в БД..."
+        entity.update(newData)
+    END METHOD
+
+    METHOD formResponse(entity: Object) -> Response IS
+        PRINT "Base: Формування стандартної відповіді (Код + Статус)..."
+        RETURN Response(200, "OK")
+    END METHOD
+
+
+    // --- Хуки (Hooks) ---
+    // Методи з порожньою реалізацією, які можна перевизначити за потреби
+
+    METHOD hookBeforeValidation(entity: Object, newData: Map) -> Void IS
+        // За замовчуванням нічого не робить
+    END METHOD
+
+    METHOD hookOnValidationFailed(entity: Object, newData: Map) -> Void IS
+        // За замовчуванням нічого не робить
+    END METHOD
+
+END CLASS
+
+
+// ==========================================
+// 2. Конкретні реалізації (Concrete Classes)
+// ==========================================
+
+// --- Реалізація для ТОВАРУ (Product) ---
+CLASS ProductUpdater EXTENDS BaseRestUpdater IS
+    
+    // Специфічна вимога: Якщо валідація не пройшла -> сповіщення адміністратору
+    OVERRIDE METHOD hookOnValidationFailed(entity: Object, newData: Map) -> Void IS
+        PRINT "!!! ALARM: Валідація товару не пройшла. Надсилаємо повідомлення адміну в Telegram..."
+        MessengerService.send("Admin", "Помилка оновлення товару ID: " + entity.id)
+    END METHOD
+
+END CLASS
+
+
+// --- Реалізація для КОРИСТУВАЧА (User) ---
+CLASS UserUpdater EXTENDS BaseRestUpdater IS
+
+    // Специфічна вимога: Заборонено змінювати email
+    OVERRIDE METHOD validateData(entity: Object, newData: Map) -> Boolean IS
+        // Перевірка на спробу зміни email
+        IF (newData.has("email") AND newData["email"] != entity.email) THEN
+            PRINT "UserUpdater Error: Зміна email заборонена!"
+            RETURN False
+        END IF
+        
+        // Якщо email не чіпали, викликаємо базову валідацію
+        RETURN SUPER.validateData(entity, newData)
+    END METHOD
+
+END CLASS
+
+
+// --- Реалізація для ЗАМОВЛЕННЯ (Order) ---
+CLASS OrderUpdater EXTENDS BaseRestUpdater IS
+
+    // Специфічна вимога: Відповідь має містити JSON сутності
+    OVERRIDE METHOD formResponse(entity: Object) -> Response IS
+        PRINT "OrderUpdater: Формування розширеної відповіді..."
+        VAR jsonBody = JSON.serialize(entity)
+        RETURN Response(200, "OK", jsonBody)
+    END METHOD
+
+END CLASS
+
+
+// ==========================================
+// 3. Клієнтський код (Main)
+// ==========================================
+
+FUNCTION main() IS
+    PRINT "--- ТЕСТ 1: Оновлення Товару (з помилкою валідації) ---"
+    VAR productUpd = NEW ProductUpdater()
+    // Симулюємо дані, які не пройдуть валідацію
+    productUpd.updateEntity(101, {"price": -50}) 
+
+    PRINT "\n--- ТЕСТ 2: Оновлення Користувача (спроба змінити email) ---"
+    VAR userUpd = NEW UserUpdater()
+    userUpd.updateEntity(55, {"email": "new@mail.com", "name": "Ivan"})
+
+    PRINT "\n--- ТЕСТ 3: Оновлення Замовлення (JSON відповідь) ---"
+    VAR orderUpd = NEW OrderUpdater()
+    VAR response = orderUpd.updateEntity(777, {"status": "shipped"})
+    PRINT "Отримано відповідь: " + response.body
+END FUNCTION
