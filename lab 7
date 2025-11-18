@@ -1,0 +1,94 @@
+// 1. Інтерфейс Стратегії
+// Визначає спільний метод для розрахунку вартості, який повинні мати всі способи доставки.
+INTERFACE DeliveryStrategy IS
+    // Метод приймає параметри замовлення (наприклад, відстань) і повертає вартість
+    METHOD calculateCost(distanceKm: Float, orderTotal: Money) -> Money
+END INTERFACE
+
+
+// 2. Конкретні Стратегії
+// Кожен клас реалізує власний алгоритм розрахунку вартості.
+
+// Варіант А: Самовивіз (Pickup)
+CLASS PickupStrategy IMPLEMENTS DeliveryStrategy IS
+    METHOD calculateCost(distanceKm: Float, orderTotal: Money) -> Money IS
+        PRINT "Стратегія: Розрахунок для самовивозу"
+        // Самовивіз зазвичай безкоштовний
+        RETURN 0.00
+    END METHOD
+END CLASS
+
+// Варіант Б: Доставка зовнішньою службою (External Delivery)
+CLASS ExternalDeliveryStrategy IMPLEMENTS DeliveryStrategy IS
+    METHOD calculateCost(distanceKm: Float, orderTotal: Money) -> Money IS
+        PRINT "Стратегія: Розрахунок через зовнішню службу (Glovo/Bolt/Uber)"
+        // Логіка: фіксована ставка + тариф за км
+        RETURN 50.00 + (distanceKm * 10.00)
+    END METHOD
+END CLASS
+
+// Варіант В: Власна служба доставки (Own Delivery)
+CLASS OwnDeliveryStrategy IMPLEMENTS DeliveryStrategy IS
+    METHOD calculateCost(distanceKm: Float, orderTotal: Money) -> Money IS
+        PRINT "Стратегія: Розрахунок власною логістикою"
+        // Логіка: дешевше, але залежить від суми замовлення
+        IF (orderTotal > 500.00) THEN
+            RETURN 0.00 // Безкоштовно для великих замовлень
+        ELSE
+            RETURN 30.00
+        END IF
+    END METHOD
+END CLASS
+
+
+// 3. Контекст (Context)
+// Клас "Замовлення" або "Додаток доставки", який використовує стратегію.
+CLASS DeliveryContext IS
+    PRIVATE PROPERTY strategy: DeliveryStrategy
+
+    // Можливість встановити або змінити стратегію "на льоту"
+    METHOD setStrategy(newStrategy: DeliveryStrategy) IS
+        THIS.strategy = newStrategy
+    END METHOD
+
+    // Метод, що делегує розрахунок поточній стратегії
+    METHOD executeCalculation(distanceKm: Float, orderTotal: Money) -> Money IS
+        IF (THIS.strategy IS NULL) THEN
+            THROW ERROR "Спосіб доставки не обрано!"
+        END IF
+        
+        RETURN THIS.strategy.calculateCost(distanceKm, orderTotal)
+    END METHOD
+END CLASS
+
+
+// 4. Клієнтський код (Client Code)
+// Симуляція вибору користувача у додатку
+FUNCTION main() IS
+    // Створюємо контекст (замовлення)
+    VAR orderContext = NEW DeliveryContext()
+    
+    // Вхідні дані замовлення
+    VAR distance = 5.5 // км
+    VAR total = 200.00 // грн
+
+    PRINT "=== ВИБІР СПОСОБУ ДОСТАВКИ ==="
+
+    // Ситуація 1: Користувач обрав Самовивіз
+    PRINT "--> Користувач обрав: Самовивіз"
+    orderContext.setStrategy(NEW PickupStrategy())
+    VAR cost1 = orderContext.executeCalculation(distance, total)
+    PRINT "    Вартість доставки: " + cost1
+
+    // Ситуація 2: Користувач змінив думку -> Зовнішня доставка
+    PRINT "--> Користувач обрав: Зовнішня служба"
+    orderContext.setStrategy(NEW ExternalDeliveryStrategy())
+    VAR cost2 = orderContext.executeCalculation(distance, total)
+    PRINT "    Вартість доставки: " + cost2
+
+    // Ситуація 3: Користувач обрав -> Власна доставка
+    PRINT "--> Користувач обрав: Власна доставка ресторану"
+    orderContext.setStrategy(NEW OwnDeliveryStrategy())
+    VAR cost3 = orderContext.executeCalculation(distance, total)
+    PRINT "    Вартість доставки: " + cost3
+END FUNCTION
