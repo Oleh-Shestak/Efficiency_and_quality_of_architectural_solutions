@@ -1,0 +1,180 @@
+// 1. Інтерфейс Посередника
+// Визначає метод для отримання сповіщень від компонентів.
+INTERFACE Mediator IS
+    METHOD notify(sender: Component, event: String) -> Void
+END INTERFACE
+
+
+// 2. Базовий Компонент
+// Всі елементи форми знають про посередника.
+CLASS Component IS
+    PROTECTED PROPERTY mediator: Mediator
+
+    CONSTRUCTOR(mediator: Mediator) IS
+        THIS.mediator = mediator
+    END CONSTRUCTOR
+
+    METHOD setMediator(mediator: Mediator) -> Void IS
+        THIS.mediator = mediator
+    END METHOD
+END CLASS
+
+
+// 3. Конкретні Компоненти (Елементи форми)
+
+// Вибір дати
+CLASS DatePicker EXTENDS Component IS
+    METHOD selectDate(date: String) -> Void IS
+        PRINT "DatePicker: Обрано дату " + date
+        // Сповіщаємо посередника про зміну
+        THIS.mediator.notify(THIS, "dateChanged")
+    END METHOD
+END CLASS
+
+// Вибір часу (залежить від дати)
+CLASS TimeSelector EXTENDS Component IS
+    METHOD updateSlots(date: String) -> Void IS
+        PRINT "TimeSelector: Оновлення доступних слотів для дати..."
+    END METHOD
+END CLASS
+
+// Чекбокс "Інша особа"
+CLASS ReceiverCheckbox EXTENDS Component IS
+    PRIVATE PROPERTY checked: Boolean = False
+
+    METHOD toggle() -> Void IS
+        THIS.checked = !THIS.checked
+        PRINT "ReceiverCheckbox: Стан змінено на " + THIS.checked
+        THIS.mediator.notify(THIS, "checkboxChanged")
+    END METHOD
+
+    METHOD isChecked() -> Boolean IS
+        RETURN THIS.checked
+    END METHOD
+END CLASS
+
+// Поля введення (Ім'я, Телефон, Адреса)
+CLASS InputField EXTENDS Component IS
+    PRIVATE PROPERTY name: String
+    PRIVATE PROPERTY visible: Boolean = True
+    PRIVATE PROPERTY required: Boolean = False
+    PRIVATE PROPERTY active: Boolean = True
+
+    CONSTRUCTOR(name: String, mediator: Mediator) IS
+        SUPER(mediator)
+        THIS.name = name
+    END CONSTRUCTOR
+
+    METHOD setVisible(visible: Boolean) -> Void IS
+        THIS.visible = visible
+        PRINT "Field [" + THIS.name + "]: Видимість = " + visible
+    END METHOD
+
+    METHOD setRequired(required: Boolean) -> Void IS
+        THIS.required = required
+        PRINT "Field [" + THIS.name + "]: Обов'язкове = " + required
+    END METHOD
+
+    METHOD setActive(active: Boolean) -> Void IS
+        THIS.active = active
+        PRINT "Field [" + THIS.name + "]: Активне = " + active
+    END METHOD
+END CLASS
+
+// Перемикач "Самовивіз" vs "Доставка"
+CLASS DeliveryModeToggle EXTENDS Component IS
+    PRIVATE PROPERTY isPickup: Boolean = False
+
+    METHOD setPickupMode(enabled: Boolean) -> Void IS
+        THIS.isPickup = enabled
+        PRINT "DeliveryMode: Режим самовивозу = " + enabled
+        THIS.mediator.notify(THIS, "deliveryModeChanged")
+    END METHOD
+
+    METHOD isPickupMode() -> Boolean IS
+        RETURN THIS.isPickup
+    END METHOD
+END CLASS
+
+
+// 4. Конкретний Посередник (Concrete Mediator)
+// Містить усю бізнес-логіку взаємодії компонентів форми.
+CLASS OrderFormMediator IMPLEMENTS Mediator IS
+    // Посилання на всі компоненти форми
+    PUBLIC PROPERTY datePicker: DatePicker
+    PUBLIC PROPERTY timeSelector: TimeSelector
+    PUBLIC PROPERTY receiverCheckbox: ReceiverCheckbox
+    PUBLIC PROPERTY receiverNameInput: InputField
+    PUBLIC PROPERTY receiverPhoneInput: InputField
+    PUBLIC PROPERTY addressInput: InputField
+    PUBLIC PROPERTY deliveryToggle: DeliveryModeToggle
+
+    // Метод обробки подій
+    METHOD notify(sender: Component, event: String) -> Void IS
+        
+        // Логіка 1: Зміна дати впливає на час 
+        IF (event == "dateChanged") THEN
+            PRINT "Mediator: Реагую на зміну дати. Оновлюю TimeSelector."
+            THIS.timeSelector.updateSlots("newDate")
+        END IF
+
+        // Логіка 2: Чекбокс "Інша особа" 
+        IF (event == "checkboxChanged") THEN
+            VAR isOtherPerson = THIS.receiverCheckbox.isChecked()
+            PRINT "Mediator: Реагую на 'Інша особа'. Показую/ховаю поля."
+            
+            // Поля з'являються
+            THIS.receiverNameInput.setVisible(isOtherPerson)
+            THIS.receiverPhoneInput.setVisible(isOtherPerson)
+            
+            // Поля стають обов'язковими
+            THIS.receiverNameInput.setRequired(isOtherPerson)
+            THIS.receiverPhoneInput.setRequired(isOtherPerson)
+        END IF
+
+        // Логіка 3: Самовивіз відключає поля доставки 
+        IF (event == "deliveryModeChanged") THEN
+            VAR isPickup = THIS.deliveryToggle.isPickupMode()
+            PRINT "Mediator: Реагую на режим доставки. Блокую/розблокую адресу."
+            
+            // Якщо самовивіз -> поле адреси неактивне
+            // Якщо доставка -> поле адреси активне
+            THIS.addressInput.setActive(!isPickup)
+        END IF
+
+    END METHOD
+END CLASS
+
+
+// 5. Клієнтський код (Main)
+FUNCTION main() IS
+    // 1. Створення посередника
+    VAR mediator = NEW OrderFormMediator()
+
+    // 2. Створення компонентів та прив'язка до посередника
+    VAR datePicker = NEW DatePicker(mediator)
+    VAR timeSelect = NEW TimeSelector(mediator)
+    VAR otherPersonCheck = NEW ReceiverCheckbox(mediator)
+    VAR nameInput = NEW InputField("Ім'я отримувача", mediator)
+    VAR phoneInput = NEW InputField("Телефон отримувача", mediator)
+    VAR addrInput = NEW InputField("Адреса доставки", mediator)
+    VAR deliveryToggle = NEW DeliveryModeToggle(mediator)
+
+    // 3. Реєстрація компонентів у посереднику
+    mediator.datePicker = datePicker
+    mediator.timeSelector = timeSelect
+    mediator.receiverCheckbox = otherPersonCheck
+    mediator.receiverNameInput = nameInput
+    mediator.receiverPhoneInput = phoneInput
+    mediator.addressInput = addrInput
+    mediator.deliveryToggle = deliveryToggle
+
+    PRINT "=== СЦЕНАРІЙ 1: Користувач обирає дату ==="
+    datePicker.selectDate("2023-12-31")
+
+    PRINT "\n=== СЦЕНАРІЙ 2: Користувач ставить галочку 'Інша особа' ==="
+    otherPersonCheck.toggle() // Поля мають з'явитись і стати обов'язковими
+
+    PRINT "\n=== СЦЕНАРІЙ 3: Користувач обирає 'Самовивіз' ==="
+    deliveryToggle.setPickupMode(True) // Поле адреси має стати неактивним
+END FUNCTION
